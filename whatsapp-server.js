@@ -1,7 +1,16 @@
 const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
+const http = require('http');
+const { Server } = require('socket.io');
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*', // Allow all origins (update this for production)
+        methods: ['GET', 'POST']
+    }
+});
 const port = process.env.PORT || 3000;
 
 const client = new Client({
@@ -22,20 +31,24 @@ client.on('qr', (qr) => {
         qrCode = url;
         qrGenerated = true;
         console.log('QR code generated');
+        io.emit('qr', url); // Send QR code to clients via WebSocket
     });
 });
 
 client.on('ready', () => {
     console.log('Client is ready!');
+    io.emit('ready'); // Notify clients when ready
 });
 
 client.on('auth_failure', (msg) => {
     console.error('Authentication failed:', msg);
+    io.emit('auth_failure', msg); // Notify clients of auth failure
 });
 
 client.on('disconnected', (reason) => {
     console.log('Client was logged out:', reason);
     qrGenerated = false; // Reset QR code status
+    io.emit('disconnected', reason); // Notify clients of disconnection
 });
 
 client.initialize();
@@ -64,6 +77,16 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+    if (qrGenerated) {
+        socket.emit('qr', qrCode); // Send existing QR code to new clients
+    }
+    if (client.info) {
+        socket.emit('ready'); // Notify new clients if already ready
+    }
+});
+
+server.listen(port, () => {
     console.log(`WhatsApp server running at http://localhost:${port}`);
 }); 
