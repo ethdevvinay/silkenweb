@@ -1,8 +1,9 @@
 const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -78,6 +79,26 @@ app.post('/send-message', async (req, res) => {
         const { to, message } = req.body;
         const chatId = to.includes('@') ? to : `${to}@c.us`;
         await client.sendMessage(chatId, message);
+        res.sendStatus(200);
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
+});
+
+app.post('/send-invoice', async (req, res) => {
+    try {
+        const { to } = req.body;
+        const filePath = 'path/to/invoice.pdf';
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).send('File not found!');
+        }
+
+        const file = fs.readFileSync(filePath);
+        const base64File = file.toString('base64');
+        const media = new MessageMedia('application/pdf', base64File, 'invoice.pdf');
+
+        await client.sendMessage(to, media, { caption: 'Here is your invoice.' });
         res.sendStatus(200);
     } catch (error) {
         res.status(500).send(error.message);
