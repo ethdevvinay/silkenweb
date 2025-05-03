@@ -77,6 +77,10 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
+app.get('/', (req, res) => {
+    res.send('WhatsApp server is running!');
+});
+
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
     if (qrGenerated) {
