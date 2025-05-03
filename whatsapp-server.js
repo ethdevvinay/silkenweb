@@ -15,6 +15,11 @@ const io = new Server(server, {
 });
 const port = process.env.PORT || 3000;
 
+// Ensure session folder exists
+if (!fs.existsSync('./session')) {
+    fs.mkdirSync('./session');
+}
+
 // Enable CORS for all routes
 app.use(cors({
     origin: '*',  // Allow all origins (you can replace * with your frontend URL)
@@ -40,10 +45,6 @@ client.on('qr', (qr) => {
 
 client.on('authenticated', () => {
     console.log('AUTHENTICATED');
-    // Ensure session folder exists
-    if (!fs.existsSync('./session')) {
-        fs.mkdirSync('./session');
-    }
     io.emit('ready'); // Notify clients when ready
     io.emit('connected', true); // Emit 'connected' event
 });
@@ -85,14 +86,24 @@ app.get('/status', (req, res) => {
     res.json({ authenticated: client.info ? true : false });
 });
 
-app.post('/send-message', async (req, res) => {
+app.post('/send', express.json(), async (req, res) => {
     try {
-        const { to, message } = req.body;
-        const chatId = to.includes('@') ? to : `${to}@c.us`;
-        await client.sendMessage(chatId, message);
-        res.sendStatus(200);
+        const { phone, message, file } = req.body;
+        
+        if (!client.info) {
+            throw new Error('WhatsApp client is not authenticated');
+        }
+
+        // Validate phone number
+        const formattedPhone = phone.replace(/[^0-9]/g, '');
+        const finalPhone = formattedPhone.length === 10 ? `91${formattedPhone}` : formattedPhone;
+        const chatId = `${finalPhone}@c.us`;
+
+        // Send message
+        const result = await client.sendMessage(chatId, message);
+        res.json({ success: true, message: 'Message sent successfully', data: result });
     } catch (error) {
-        res.status(500).send(error.message);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
