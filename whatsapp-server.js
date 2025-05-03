@@ -15,6 +15,10 @@ let qrGenerated = false;
 
 client.on('qr', (qr) => {
     qrcode.toDataURL(qr, (err, url) => {
+        if (err) {
+            console.error('Failed to generate QR code:', err);
+            return;
+        }
         qrCode = url;
         qrGenerated = true;
         console.log('QR code generated');
@@ -31,6 +35,7 @@ client.on('auth_failure', (msg) => {
 
 client.on('disconnected', (reason) => {
     console.log('Client was logged out:', reason);
+    qrGenerated = false; // Reset QR code status
 });
 
 client.initialize();
