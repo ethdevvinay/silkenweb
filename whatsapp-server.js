@@ -4,6 +4,7 @@ const qrcode = require('qrcode');
 const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
+const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -13,6 +14,13 @@ const io = new Server(server, {
     }
 });
 const port = process.env.PORT || 3000;
+
+// Enable CORS for all routes
+app.use(cors({
+    origin: '*',  // Allow all origins (you can replace * with your frontend URL)
+    methods: ['GET', 'POST'],  // Allow only GET and POST requests
+    allowedHeaders: ['Content-Type']  // Allow only specific headers
+}));
 
 const client = new Client({
     authStrategy: new LocalAuth({
