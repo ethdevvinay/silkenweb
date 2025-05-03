@@ -55,6 +55,10 @@ client.initialize();
 
 app.use(express.json());
 
+app.get('/', (req, res) => {
+    res.send('WhatsApp server is running!');
+});
+
 app.get('/qr-code', (req, res) => {
     if (!qrGenerated) {
         return res.status(404).send('QR code not available yet. Please try again in a few seconds.');
@@ -75,10 +79,6 @@ app.post('/send-message', async (req, res) => {
     } catch (error) {
         res.status(500).send(error.message);
     }
-});
-
-app.get('/', (req, res) => {
-    res.send('WhatsApp server is running!');
 });
 
 io.on('connection', (socket) => {
