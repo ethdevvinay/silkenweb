@@ -37,11 +37,11 @@ const client = new Client({
 
 let qrCode = null;
 let qrGenerated = false;
+let currentQR = null;
 
 client.on('qr', (qr) => {
     console.log('QR RECEIVED:', qr);
-    // Remove qrcode-terminal if you want to show QR code only in whatsapp_settings.php
-    // qrcode.generate(qr, { small: true });  // Comment this line
+    currentQR = qr;
 });
 
 client.on('authenticated', () => {
@@ -81,6 +81,13 @@ app.get('/qr-code', (req, res) => {
         return res.status(404).send('QR code not available yet. Please try again in a few seconds.');
     }
     res.send(qrCode);
+});
+
+app.get('/qr', (req, res) => {
+    if (!currentQR) {
+        return res.status(404).json({ success: false, message: 'QR code not available' });
+    }
+    res.json({ success: true, qr: currentQR });
 });
 
 app.get('/status', (req, res) => {
