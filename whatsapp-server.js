@@ -1,6 +1,6 @@
 const express = require('express');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
+const qrcode = require('qrcode-terminal');
 const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
@@ -23,40 +23,44 @@ app.use(cors({
 }));
 
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: 'sessions'
-    })
+    authStrategy: new LocalAuth({ dataPath: './session' }),  // Ensure session is saved in ./session folder
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 });
 
 let qrCode = null;
 let qrGenerated = false;
 
 client.on('qr', (qr) => {
-    qrcode.toDataURL(qr, (err, url) => {
-        if (err) {
-            console.error('Failed to generate QR code:', err);
-            return;
-        }
-        qrCode = url;
-        qrGenerated = true;
-        console.log('QR code generated');
-        io.emit('qr', url); // Send QR code to clients via WebSocket
-    });
+    console.log('QR RECEIVED:', qr);
+    qrcode.generate(qr, { small: true });
 });
 
-client.on('ready', () => {
-    console.log('Client is ready!');
+client.on('authenticated', () => {
+    console.log('AUTHENTICATED');
+    // Ensure session folder exists
+    if (!fs.existsSync('./session')) {
+        fs.mkdirSync('./session');
+    }
     io.emit('ready'); // Notify clients when ready
     io.emit('connected', true); // Emit 'connected' event
 });
 
 client.on('auth_failure', (msg) => {
-    console.error('Authentication failed:', msg);
+    console.error('AUTHENTICATION FAILED:', msg);
     io.emit('auth_failure', msg); // Notify clients of auth failure
 });
 
+client.on('ready', () => {
+    console.log('CLIENT READY');
+    io.emit('ready'); // Notify clients when ready
+    io.emit('connected', true); // Emit 'connected' event
+});
+
 client.on('disconnected', (reason) => {
-    console.log('Client was logged out:', reason);
+    console.log('CLIENT DISCONNECTED:', reason);
     qrGenerated = false; // Reset QR code status
     io.emit('disconnected', reason); // Notify clients of disconnection
     io.emit('connected', false); // Emit 'connected' event
@@ -78,8 +82,7 @@ app.get('/qr-code', (req, res) => {
 });
 
 app.get('/status', (req, res) => {
-    const isAuthenticated = client.info !== undefined && client.info !== null;
-    res.json({ authenticated: isAuthenticated });
+    res.json({ authenticated: client.info ? true : false });
 });
 
 app.post('/send-message', async (req, res) => {
