@@ -38,6 +38,7 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     console.log('Client is ready!');
     io.emit('ready'); // Notify clients when ready
+    io.emit('connected', true); // Emit 'connected' event
 });
 
 client.on('auth_failure', (msg) => {
@@ -49,6 +50,7 @@ client.on('disconnected', (reason) => {
     console.log('Client was logged out:', reason);
     qrGenerated = false; // Reset QR code status
     io.emit('disconnected', reason); // Notify clients of disconnection
+    io.emit('connected', false); // Emit 'connected' event
 });
 
 client.initialize();
@@ -88,6 +90,7 @@ io.on('connection', (socket) => {
     }
     if (client.info) {
         socket.emit('ready'); // Notify new clients if already ready
+        socket.emit('connected', true); // Notify new clients if already connected
     }
 });
 
