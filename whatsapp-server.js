@@ -69,7 +69,8 @@ app.get('/qr-code', (req, res) => {
 });
 
 app.get('/status', (req, res) => {
-    res.json({ authenticated: client.info !== undefined });
+    const isAuthenticated = client.info !== undefined && client.info !== null;
+    res.json({ authenticated: isAuthenticated });
 });
 
 app.post('/send-message', async (req, res) => {
