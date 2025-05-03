@@ -40,7 +40,8 @@ let qrGenerated = false;
 
 client.on('qr', (qr) => {
     console.log('QR RECEIVED:', qr);
-    qrcode.generate(qr, { small: true });
+    // Remove qrcode-terminal if you want to show QR code only in whatsapp_settings.php
+    // qrcode.generate(qr, { small: true });  // Comment this line
 });
 
 client.on('authenticated', () => {
