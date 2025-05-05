@@ -4,15 +4,15 @@
   "description": "WhatsApp Server for Silken Aesthetic",
   "main": "whatsapp-server.js",
   "scripts": {
-    "start": "mkdir -p session && node whatsapp-server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node whatsapp-server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "whatsapp-web.js": "^1.21.0",
+    "qrcode": "^1.5.3",
+    "sqlite3": "^5.1.6",
     "qrcode-terminal": "^0.12.0",
-    "fs": "^0.0.1-security",
     "socket.io": "^4.7.2"
   }
 }
