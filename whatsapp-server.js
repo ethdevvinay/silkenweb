@@ -32,9 +32,17 @@ app.use(cors({
 let client;
 let currentQR = null;
 let isAuthenticated = false;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 async function initializeWhatsAppClient() {
     try {
+        // Clear any existing client
+        if (client) {
+            await client.destroy();
+            client = null;
+        }
+
         // Check for existing session
         const savedSession = await database.getSession('whatsapp_session');
         
@@ -52,15 +60,28 @@ async function initializeWhatsAppClient() {
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-extensions',
+                    '--disable-default-apps',
+                    '--disable-translate',
+                    '--disable-sync',
+                    '--disable-background-networking',
+                    '--metrics-recording-only',
+                    '--mute-audio',
+                    '--no-default-browser-check',
+                    '--safebrowsing-disable-auto-update'
                 ]
-            }
+            },
+            qrMaxRetries: 5,
+            authTimeoutMs: 60000,
+            restartOnAuthFail: true
         });
 
         client.on('qr', async (qr) => {
             console.log('QR Generated');
             currentQR = qr;
             isAuthenticated = false;
+            reconnectAttempts = 0;
             
             try {
                 // Generate QR Code Image
@@ -78,6 +99,7 @@ async function initializeWhatsAppClient() {
             console.log('Authenticated');
             isAuthenticated = true;
             currentQR = null;
+            reconnectAttempts = 0;
             
             try {
                 await database.saveSession('whatsapp_session', session);
@@ -91,6 +113,7 @@ async function initializeWhatsAppClient() {
             console.log('Client is ready');
             isAuthenticated = true;
             currentQR = null;
+            reconnectAttempts = 0;
             io.emit('ready');
             io.emit('connected', true);
         });
@@ -99,21 +122,35 @@ async function initializeWhatsAppClient() {
             console.error('Authentication failure:', msg);
             isAuthenticated = false;
             io.emit('auth_failure', msg);
+            
+            // Clear session on auth failure
+            database.deleteSession('whatsapp_session');
+            database.deleteSession('current_qr');
         });
 
-        client.on('disconnected', (reason) => {
+        client.on('disconnected', async (reason) => {
             console.log('Client disconnected:', reason);
             isAuthenticated = false;
             io.emit('disconnected', reason);
-            // Try to reinitialize after 5 seconds
-            setTimeout(initializeWhatsAppClient, 5000);
+
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                setTimeout(initializeWhatsAppClient, 5000);
+            } else {
+                console.log('Max reconnection attempts reached. Please restart the server.');
+                io.emit('max_reconnect_attempts');
+            }
         });
 
         await client.initialize();
     } catch (error) {
         console.error('Error initializing WhatsApp client:', error);
-        // Try to reinitialize after 5 seconds
-        setTimeout(initializeWhatsAppClient, 5000);
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+            setTimeout(initializeWhatsAppClient, 5000);
+        }
     }
 }
 
@@ -147,7 +184,8 @@ app.get('/status', (req, res) => {
     res.json({ 
         authenticated: isAuthenticated,
         ready: client && client.info ? true : false,
-        hasQR: currentQR !== null
+        hasQR: currentQR !== null,
+        reconnectAttempts: reconnectAttempts
     });
 });
 
@@ -187,6 +225,17 @@ app.post('/send-invoice', async (req, res) => {
         res.sendStatus(200);
     } catch (error) {
         res.status(500).send(error.message);
+    }
+});
+
+// Add new endpoint to force reconnection
+app.post('/reconnect', async (req, res) => {
+    try {
+        reconnectAttempts = 0;
+        await initializeWhatsAppClient();
+        res.json({ success: true, message: 'Reconnection initiated' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
